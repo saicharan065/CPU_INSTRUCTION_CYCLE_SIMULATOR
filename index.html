@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Instruction Cycle & Datapath Simulator | COA Project</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div class="app-wrapper">
+        <!-- TOP APP HEADER -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="cpu-icon-badge">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        <rect x="9" y="9" width="6" height="6"/>
+                        <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>CPU INSTRUCTION CYCLE &amp; DATAPATH SIMULATOR</h1>
+                    <p class="subtitle">Computer Organization &amp; Architecture (COA) • Micro-Operation &amp; Interrupt Cycle Level</p>
+                </div>
+            </div>
+
+            <div class="header-status-panel">
+                <div class="status-item">
+                    <span class="status-label">PHASE</span>
+                    <span class="status-badge phase-badge" id="badge-phase">FETCH</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">T-STATE</span>
+                    <span class="status-badge tstate-badge" id="badge-tstate">T0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">CLOCK CYCLES</span>
+                    <span class="status-value mono" id="stat-cycles">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">INSTRUCTIONS</span>
+                    <span class="status-value mono" id="stat-instructions">0</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">INTERRUPT</span>
+                    <span class="status-badge intr-badge" id="badge-intr">IE: 0 | INTR: 0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- COMMAND & CONTROL BAR -->
+        <nav class="control-bar">
+            <div class="control-group program-select-group">
+                <label for="preset-select">Preset Program:</label>
+                <select id="preset-select" class="select-input">
+                    <option value="add">1. Basic Addition (ADD)</option>
+                    <option value="mul_hw">2. Hardware Multiplication (MUL)</option>
+                    <option value="count_sum">3. Count Sum Loop (Sum 1 to N)</option>
+                    <option value="factorial" selected>4. Factorial Calculation (N!)</option>
+                </select>
+                <button id="btn-load-preset" class="btn btn-secondary" title="Load selected program into editor">Load</button>
+            </div>
+
+            <div class="control-group playback-group">
+                <button id="btn-run" class="btn btn-primary" title="Run / Pause Clock (Spacebar)">
+                    <span class="btn-icon">▶</span> <span id="btn-run-text">Run</span>
+                </button>
+                <button id="btn-step-micro" class="btn btn-outline" title="Step 1 Micro-Operation / T-State (S)">
+                    <span class="btn-icon">⏭</span> Step Micro (T-State)
+                </button>
+                <button id="btn-step-instr" class="btn btn-outline" title="Step 1 Complete Instruction (I)">
+                    <span class="btn-icon">⏯</span> Step Instruction
+                </button>
+                <button id="btn-reset" class="btn btn-danger" title="Reset Registers, Clock &amp; State (R)">
+                    <span class="btn-icon">↺</span> Reset
+                </button>
+                <button id="btn-trigger-intr" class="btn btn-warning pulse-btn" title="Assert Hardware Interrupt Line (T)">
+                    <span class="btn-icon">⚡</span> Trigger Interrupt (INTR)
+                </button>
+            </div>
+
+            <div class="control-group speed-group">
+                <label for="speed-slider">Speed: <span id="speed-label" class="mono">20 Hz</span></label>
+                <input type="range" id="speed-slider" min="1" max="25" value="20" class="slider-input">
+            </div>
+
+            <div class="control-group modal-group">
+                <button id="btn-sound-toggle" class="btn btn-outline" title="Toggle Sound Feedback">
+                    <span id="sound-icon">🔊</span> <span id="sound-text">Sound: ON</span>
+                </button>
+                <button id="btn-open-theory" class="btn btn-info" title="Theoretical Reference: Instruction Cycle &amp; Interrupts">
+                    📖 Theory &amp; ISA Reference
+                </button>
+            </div>
+        </nav>
+
+        <!-- MAIN 3-COLUMN WORKSPACE GRID (Matches Screenshot) -->
+        <main class="main-grid">
+            <!-- LEFT PANEL: CODE EDITOR & ASSEMBLER -->
+            <section class="grid-panel editor-panel">
+                <div class="panel-header">
+                    <h2>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="16 18 22 12 16 6"/>
+                            <polyline points="8 6 2 12 8 18"/>
+                        </svg>
+                        ASSEMBLY CODE EDITOR
+                    </h2>
+                    <div class="panel-actions">
+                        <button id="btn-assemble" class="btn btn-sm btn-primary">⚡ Assemble &amp; Load RAM</button>
+                    </div>
+                </div>
+
+                <div class="editor-container">
+                    <textarea id="assembly-editor" spellcheck="false" placeholder="Write assembly instructions here..."></textarea>
+                </div>
+
+                <div class="assembler-status" id="assembler-status">
+                    <span class="status-dot"></span>
+                    <span id="assembler-status-text">Assembled successfully! Generated 18 instructions/data words.</span>
+                </div>
+            </section>
+
+            <!-- CENTER PANEL: INTERACTIVE DATAPATH & MICRO-OPERATION RTL -->
+            <section class="grid-panel datapath-panel">
+                <div class="panel-header">
+                    <h2>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="8" rx="2"/>
+                            <rect x="2" y="14" width="20" height="8" rx="2"/>
+                            <line x1="6" y1="6" x2="6.01" y2="6"/>
+                            <line x1="6" y1="18" x2="6.01" y2="18"/>
+                        </svg>
+                        DATAPATH (ACTIVE REGISTERS AND BUSES HIGHLIGHTED)
+                    </h2>
+                    <div class="datapath-legend">
+                        <span class="legend-item"><span class="legend-color legend-addr"></span> Address Bus</span>
+                        <span class="legend-item"><span class="legend-color legend-data"></span> Data Bus</span>
+                        <span class="legend-item"><span class="legend-color legend-alu"></span> ALU Path</span>
+                    </div>
+                </div>
+
+                <!-- Datapath SVG Render Target -->
+                <div class="datapath-canvas-wrapper" id="datapath-container">
+                    <!-- Injected by DatapathView -->
+                </div>
+
+                <!-- LIVE MICRO-OPERATION BANNER -->
+                <div class="micro-operation-card" id="micro-op-card">
+                    <div class="micro-op-header">
+                        <div class="micro-op-badge-group">
+                            <span class="tstate-pill" id="micro-tstate">T0</span>
+                            <span class="phase-pill" id="micro-phase">FETCH PHASE</span>
+                        </div>
+                        <div class="control-signals-list" id="micro-signals">
+                            <span class="signal-tag">PC_out</span>
+                            <span class="signal-tag">MAR_in</span>
+                        </div>
+                    </div>
+                    <div class="micro-op-rtl">
+                        <span class="rtl-label">RTL Operation:</span>
+                        <span class="rtl-text" id="micro-rtl">MAR ← PC [0x00]</span>
+                    </div>
+                </div>
+
+                <!-- T-STATE TIMELINE PROGRESS STRIP -->
+                <div class="timeline-container">
+                    <div class="timeline-label">Cycle Timeline:</div>
+                    <div class="timeline-steps" id="timeline-steps">
+                        <div class="timeline-step active" data-t="T0">T0 (MAR←PC)</div>
+                        <div class="timeline-step" data-t="T1">T1 (MDR←M, PC++)</div>
+                        <div class="timeline-step" data-t="T2">T2 (IR←MDR)</div>
+                        <div class="timeline-step" data-t="T3">T3 (Decode)</div>
+                        <div class="timeline-step" data-t="T4">T4 (Execute)</div>
+                        <div class="timeline-step" data-t="T5">T5 (Execute)</div>
+                        <div class="timeline-step" data-t="T6">T6 (Execute)</div>
+                    </div>
+                </div>
+
+                <!-- RECENT MICRO-OPERATIONS LOG -->
+                <div class="execution-log-container">
+                    <div class="sub-header">
+                        <h3>MICRO-OPERATION EXECUTION TRACE LOG</h3>
+                        <button id="btn-clear-log" class="btn btn-xs btn-outline">Clear Log</button>
+                    </div>
+                    <div class="log-stream" id="log-stream">
+                        <div class="log-entry system">[SYSTEM] Simulator initialized. Ready to execute instruction cycle.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: REGISTERS, OUTPUT DISPLAY & RAM GRID -->
+            <section class="grid-panel state-panel">
+                <!-- REGISTERS & FLAGS CARD -->
+                <div class="card registers-card">
+                    <div class="panel-header">
+                        <h2>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <path d="M3 9h18M9 21V9"/>
+                            </svg>
+                            CPU REGISTERS &amp; FLAGS
+                        </h2>
+                    </div>
+
+                    <div class="registers-grid">
+                        <div class="reg-box" id="reg-box-PC">
+                            <span class="reg-name">PC (Program Counter)</span>
+                            <span class="reg-val mono" id="reg-PC">0x00</span>
+                            <span class="reg-dec mono" id="reg-PC-dec">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-MAR">
+                            <span class="reg-name">MAR (Memory Address)</span>
+                            <span class="reg-val mono" id="reg-MAR">0x00</span>
+                            <span class="reg-dec mono" id="reg-MAR-dec">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-MDR">
+                            <span class="reg-name">MDR (Memory Data)</span>
+                            <span class="reg-val mono" id="reg-MDR">0x0000</span>
+                            <span class="reg-dec mono" id="reg-MDR-dec">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-IR">
+                            <span class="reg-name">IR (Instruction)</span>
+                            <span class="reg-val mono" id="reg-IR">0x0000</span>
+                            <span class="reg-dec mono" id="reg-IR-dec">NOP</span>
+                        </div>
+                        <div class="reg-box reg-highlight" id="reg-box-ACC">
+                            <span class="reg-name">ACC (Accumulator)</span>
+                            <span class="reg-val mono accent-green" id="reg-ACC">0x0000</span>
+                            <span class="reg-dec mono" id="reg-ACC-dec">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-SP">
+                            <span class="reg-name">SP (Stack Pointer)</span>
+                            <span class="reg-val mono" id="reg-SP">0x7F</span>
+                            <span class="reg-dec mono" id="reg-SP-dec">127</span>
+                        </div>
+                    </div>
+
+                    <!-- FLAGS REGISTER -->
+                    <div class="flags-container">
+                        <span class="flags-title">FLAGS REGISTER (Status Flip-Flops):</span>
+                        <div class="flags-badges">
+                            <div class="flag-badge" id="flag-z">
+                                <span class="flag-letter">Z</span>
+                                <span class="flag-desc">Zero</span>
+                                <span class="flag-state" id="val-flag-z">0</span>
+                            </div>
+                            <div class="flag-badge" id="flag-n">
+                                <span class="flag-letter">N</span>
+                                <span class="flag-desc">Negative</span>
+                                <span class="flag-state" id="val-flag-n">0</span>
+                            </div>
+                            <div class="flag-badge" id="flag-c">
+                                <span class="flag-letter">C</span>
+                                <span class="flag-desc">Carry</span>
+                                <span class="flag-state" id="val-flag-c">0</span>
+                            </div>
+                            <div class="flag-badge" id="flag-ie">
+                                <span class="flag-letter">IE</span>
+                                <span class="flag-desc">Intr Enable</span>
+                                <span class="flag-state" id="val-flag-ie">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HARDWARE OUTPUT DISPLAY -->
+                <div class="card output-card">
+                    <div class="panel-header">
+                        <h2>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            HARDWARE OUTPUT (OUT REGISTER)
+                        </h2>
+                    </div>
+                    <div class="output-display-box">
+                        <div class="seven-segment-display">
+                            <span class="display-val mono" id="display-out-val">0</span>
+                        </div>
+                        <div class="output-meta">
+                            <span>Hex: <strong class="mono" id="display-out-hex">0x0000</strong></span>
+                            <span>Binary: <strong class="mono" id="display-out-bin">00000000 00000000</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RAM MEMORY GRID INSPECTOR -->
+                <div class="card memory-card">
+                    <div class="panel-header">
+                        <h2>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="4" y="4" width="16" height="16" rx="2"/>
+                                <rect x="9" y="4" width="6" height="16"/>
+                                <rect x="4" y="9" width="16" height="6"/>
+                            </svg>
+                            RAM MEMORY INSPECTOR (256 WORDS)
+                        </h2>
+                        <div class="memory-search-group">
+                            <input type="text" id="input-mem-search" placeholder="Go to Addr (hex/dec)..." class="search-input">
+                        </div>
+                    </div>
+
+                    <div class="memory-legend">
+                        <span class="mem-badge mem-badge-pc">PC Pointer</span>
+                        <span class="mem-badge mem-badge-mar">MAR Pointer</span>
+                        <span class="mem-badge mem-badge-sp">SP Pointer</span>
+                        <span class="mem-badge mem-badge-isr">ISR (0x28)</span>
+                    </div>
+
+                    <div class="table-scroll-container mem-table-container" id="mem-scroll-container">
+                        <table class="data-table mem-table" id="table-ram">
+                            <thead>
+                                <tr>
+                                    <th>Addr</th>
+                                    <th>Hex</th>
+                                    <th>Dec</th>
+                                    <th>Disassembly</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-ram">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- THEORETICAL REFERENCE MODAL (Matches Image 1 & 2) -->
+        <div class="modal-backdrop" id="theory-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-icon">📖</span>
+                        <h2>Theoretical Reference: Instruction Cycle &amp; Interrupt Servicing</h2>
+                    </div>
+                    <button class="btn-close-modal" id="btn-close-theory">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- SECTION 1 & 2 GRID (Matches Image 1) -->
+                    <div class="theory-two-col">
+                        <div class="theory-card">
+                            <h3>1. THE 3 FUNDAMENTAL CYCLE PHASES</h3>
+                            <div class="theory-section">
+                                <h4>Fetch Phase (T<sub>0</sub> – T<sub>2</sub>):</h4>
+                                <p>The address from <strong>PC</strong> is placed on the Address Bus via <strong>MAR</strong>. Memory read signal is asserted; instruction word enters <strong>MDR</strong> across Data Bus; <strong>PC</strong> is incremented (<code>PC ← PC + 1</code>); instruction loaded into <strong>IR</strong>.</p>
+                            </div>
+                            <div class="theory-section">
+                                <h4>Decode Phase (T<sub>3</sub>):</h4>
+                                <p>Control Unit extracts the 8-bit opcode, resolves addressing modes, and prepares the control matrix for functional units.</p>
+                            </div>
+                            <div class="theory-section">
+                                <h4>Execute Phase (T<sub>4</sub> – T<sub>6</sub>):</h4>
+                                <p>ALU operations, memory read/write operands, conditional branch tests, and register writebacks are completed.</p>
+                            </div>
+                        </div>
+
+                        <div class="theory-card">
+                            <h3>2. THE INTERRUPT PHASE (T<sub>INT0</sub> – T<sub>INT4</sub>)</h3>
+                            <div class="theory-section">
+                                <h4>Interrupt Check:</h4>
+                                <p>At the end of every instruction's execute cycle, hardware probes the <strong>INTR</strong> line and Interrupt Enable (<strong>IE</strong>) flip-flop.</p>
+                            </div>
+                            <div class="theory-section">
+                                <h4>State Preservation (Stack Frame):</h4>
+                                <p>The CPU decrements <strong>SP</strong> and pushes the return address (<strong>PC</strong>) onto the stack. It then decrements <strong>SP</strong> and pushes Accumulator (<strong>AC</strong>) and flags.</p>
+                            </div>
+                            <div class="theory-section">
+                                <h4>Vector Branch:</h4>
+                                <p><strong>PC</strong> is loaded with the entry point of the Interrupt Service Routine (ISR) at address <code>0x28</code>, and <strong>IE</strong> is cleared (disabled) to prevent re-entrant collision.</p>
+                            </div>
+                            <div class="theory-section">
+                                <h4>Return via IRET:</h4>
+                                <p>The ISR concludes with <code>IRET</code>, popping <strong>AC</strong> and <strong>PC</strong> from the stack and restoring the main program.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COMPLETE ISA TABLE (Matches Image 1 & 2) -->
+                    <div class="theory-isa-section">
+                        <h3>COMPLETE INSTRUCTION SET ARCHITECTURE (ISA)</h3>
+                        <div class="table-scroll-container">
+                            <table class="data-table isa-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mnemonic</th>
+                                        <th>Opcode</th>
+                                        <th>Syntax</th>
+                                        <th>RTL Operation</th>
+                                        <th>Cycles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><strong>NOP</strong></td><td class="mono">0x00</td><td class="mono">NOP</td><td>No operation</td><td class="mono">4</td></tr>
+                                    <tr><td><strong>LDA</strong></td><td class="mono">0x01</td><td class="mono">LDA addr</td><td>AC ← RAM[addr]</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>STA</strong></td><td class="mono">0x02</td><td class="mono">STA addr</td><td>RAM[addr] ← AC</td><td class="mono">6</td></tr>
+                                    <tr><td><strong>ADD</strong></td><td class="mono">0x03</td><td class="mono">ADD addr</td><td>AC ← AC + RAM[addr], Flags</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>SUB</strong></td><td class="mono">0x04</td><td class="mono">SUB addr</td><td>AC ← AC - RAM[addr], Flags</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>MUL</strong></td><td class="mono">0x05</td><td class="mono">MUL addr</td><td>AC ← AC * RAM[addr], Flags</td><td class="mono">8</td></tr>
+                                    <tr><td><strong>AND</strong></td><td class="mono">0x06</td><td class="mono">AND addr</td><td>AC ← AC &amp; RAM[addr], Flags</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>OR</strong></td><td class="mono">0x07</td><td class="mono">OR addr</td><td>AC ← AC | RAM[addr], Flags</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>XOR</strong></td><td class="mono">0x08</td><td class="mono">XOR addr</td><td>AC ← AC ^ RAM[addr], Flags</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>NOT</strong></td><td class="mono">0x09</td><td class="mono">NOT</td><td>AC ← ~AC, Flags</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>SHL</strong></td><td class="mono">0x0A</td><td class="mono">SHL</td><td>AC ← AC &lt;&lt; 1, Flags</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>INC</strong></td><td class="mono">0x0B</td><td class="mono">INC</td><td>AC ← AC + 1, Flags</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>DEC</strong></td><td class="mono">0x0C</td><td class="mono">DEC</td><td>AC ← AC - 1, Flags</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>JMP</strong></td><td class="mono">0x0D</td><td class="mono">JMP addr</td><td>PC ← addr</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>JZ</strong></td><td class="mono">0x0E</td><td class="mono">JZ addr</td><td>If Z == 1, PC ← addr</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>JNZ</strong></td><td class="mono">0x0F</td><td class="mono">JNZ addr</td><td>If Z == 0, PC ← addr</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>LDI</strong></td><td class="mono">0x10</td><td class="mono">LDI imm</td><td>AC ← imm</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>OUT</strong></td><td class="mono">0x11</td><td class="mono">OUT</td><td>OUT_REG ← AC</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>IN</strong></td><td class="mono">0x12</td><td class="mono">IN</td><td>AC ← IN_REG</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>EI</strong></td><td class="mono">0x13</td><td class="mono">EI</td><td>IE ← 1 (Enable Interrupts)</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>DI</strong></td><td class="mono">0x14</td><td class="mono">DI</td><td>IE ← 0 (Disable Interrupts)</td><td class="mono">5</td></tr>
+                                    <tr><td><strong>IRET</strong></td><td class="mono">0x15</td><td class="mono">IRET</td><td>AC ← Pop(), PC ← Pop(), IE ← 1 (Return from ISR)</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>CALL</strong></td><td class="mono">0x16</td><td class="mono">CALL addr</td><td>Push(PC), PC ← addr</td><td class="mono">7</td></tr>
+                                    <tr><td><strong>RET</strong></td><td class="mono">0x17</td><td class="mono">RET</td><td>PC ← Pop()</td><td class="mono">6</td></tr>
+                                    <tr><td><strong>PUSH</strong></td><td class="mono">0x18</td><td class="mono">PUSH</td><td>Push(AC)</td><td class="mono">6</td></tr>
+                                    <tr><td><strong>POP</strong></td><td class="mono">0x19</td><td class="mono">POP</td><td>AC ← Pop()</td><td class="mono">6</td></tr>
+                                    <tr><td><strong>HLT</strong></td><td class="mono">0x3F</td><td class="mono">HLT</td><td>Halt clock generator</td><td class="mono">5</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btn-modal-close-ok">Got it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="cpu-engine.js"></script>
+    <script src="datapath-view.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
