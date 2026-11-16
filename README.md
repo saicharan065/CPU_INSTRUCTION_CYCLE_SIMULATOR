@@ -39,12 +39,35 @@ A clean, visual, and interactive CPU architecture simulator designed to demonstr
 
 ---
 
+## 🌐 Live Demo
+
+**[Open the simulator](https://cpu-instruction-cycle-simulator-five.vercel.app/)**: runs in any browser, nothing to install.
+
+---
+
 ## 🚀 How to Run
 
-1. Open the project directory:
+**Online:** open the live demo link above.
+
+**Locally:**
+
+1. Clone or download this repository:
    ```
-   c:\Users\samud\Downloads\coa final project\
+   git clone https://github.com/saicharan065/CPU_INSTRUCTION_CYCLE_SIMULATOR.git
    ```
-2. Double-click **`index.html`** to open in any web browser (Chrome, Edge, Firefox, Safari).
+2. Open the project folder and double-click **`index.html`** to open it in any web browser (Chrome, Edge, Firefox, Safari). No build step or server is needed.
 3. Select any program from the **Program** dropdown (e.g. *Count Sum Loop*, *Software Loop Multiplication*, or *Basic Addition*).
 4. Click **Run** (<kbd>Space</kbd>) or **Step Micro (T-State)** (<kbd>S</kbd>) to watch the CPU execute cycle by cycle!
+
+---
+
+## 🛠 Tech Stack
+
+HTML, CSS and vanilla JavaScript (`cpu-engine.js`, `datapath-view.js`, `app.js`). Deployed on Vercel.
+
+---
+
+## 👤 Author
+
+Samudrala Sai Charan, B.Tech CSE, SRM University AP
+[GitHub](https://github.com/saicharan065)
